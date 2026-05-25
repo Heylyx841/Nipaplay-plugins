@@ -33,10 +33,10 @@
     },
     {
       "id": "heylyx841.danmaku_limiter",
-      "name": "弹幕数量控制器",
-      "version": "1.0.4",
+      "name": "弹幕限制器",
+      "version": "1.1.0",
       "minHostVersion": "1.10.6",
-      "description": "自定义每秒弹幕上限，超出后自动去重稀释",
+      "description": "弹幕密度限制 + 相似弹幕合并（替代原生合并渲染）",
       "author": "Heylyx841",
       "github": "",
       "file": "plugins/heylyx841.danmaku_limiter/heylyx841.danmaku_limiter.js"
