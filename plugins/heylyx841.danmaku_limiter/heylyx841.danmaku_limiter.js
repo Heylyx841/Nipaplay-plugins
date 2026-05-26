@@ -3,15 +3,14 @@
 const pluginManifest = {
   id: 'heylyx841.danmaku_limiter',
   name: '弹幕限制器',
-  version: '1.1.0',
-  minHostVersion: '1.10.6',
+  version: '1.1.1',
+  minHostVersion: '1.10.7',
   description: '弹幕密度限制 + 相似弹幕合并（替代原生合并渲染）',
   author: 'Heylyx841',
   permissions: ['danmaku.modify', 'ui.dialog'],
   priority: 80
 };
 
-var enabled = true;
 var limitEnabled = true;
 var mergeEnabled = false;
 var bigCompat = false;
@@ -38,40 +37,27 @@ function toGroupLabel(n) {
 
 function makeUI() {
   return [
-    { id: 'toggle', title: '启用', description: '总开关，关闭后所有功能不生效', enabled: enabled },
     { id: 'limitToggle', title: '密度限制', description: '每秒弹幕数量上限', enabled: limitEnabled },
     { id: 'limit', title: '每秒上限', description: '默认5条，可修改', textSetting: { hintText: '5', default: String(maxPerSec) } },
     { id: 'merge', title: '合并弹幕', description: '相似弹幕合并，替代原生合并渲染', enabled: mergeEnabled },
-    { id: 'bigCompat', title: '小字兼容', description: '设备无法显示₍ɴ₎下标时开启，改用(N)标注', enabled: bigCompat },
-    // 用此条目将所有开关状态编码为字符串
-    { id: '_cfg', title: '配置', description: '内部状态码，自动维护，勿手动修改', textSetting: { default: '1,1,0,0' } }
+    { id: 'bigCompat', title: '小字兼容', description: '设备无法显示₍ɴ₎下标时开启，改用(N)标注', enabled: bigCompat }
   ];
 }
 
 var pluginUIEntries = makeUI();
 
-// 将开关状态编码写入 _cfg 条目
+// 持久化开关状态
 function saveSwitchConfig() {
-  settings.setText('_cfg',
-    (enabled ? 1 : 0) + ',' +
-    (limitEnabled ? 1 : 0) + ',' +
-    (mergeEnabled ? 1 : 0) + ',' +
-    (bigCompat ? 1 : 0)
-  );
+  settings.setSwitch('limitToggle', limitEnabled);
+  settings.setSwitch('merge', mergeEnabled);
+  settings.setSwitch('bigCompat', bigCompat);
 }
 
 // 恢复全部配置
 function refreshConfig() {
-  var cfg = settings.getText('_cfg');
-  if (cfg) {
-    var p = cfg.split(',');
-    if (p.length >= 4) {
-      enabled = p[0] === '1';
-      limitEnabled = p[1] === '1';
-      mergeEnabled = p[2] === '1';
-      bigCompat = p[3] === '1';
-    }
-  }
+  limitEnabled = settings.getSwitch('limitToggle');
+  mergeEnabled = settings.getSwitch('merge');
+  bigCompat = settings.getSwitch('bigCompat');
   var n = settings.getText('limit');
   if (n) {
     var parsed = parseInt(n, 10);
@@ -80,7 +66,6 @@ function refreshConfig() {
 }
 
 function pluginOnInitialize() {
-  refreshConfig();
   pluginUIEntries = makeUI();
 }
 
@@ -145,7 +130,6 @@ function pluginOnEvent(e) {
   if (e.name !== 'danmakuLoaded') return;
   // 刷新配置，确保用户在设置页的修改即时生效
   refreshConfig();
-  if (!enabled) return;
 
   var list = e.data && e.data.danmaku;
   if (!Array.isArray(list) || list.length === 0) return;
@@ -264,17 +248,11 @@ function pluginOnEvent(e) {
     danmaku.replace({ count: working.length, comments: working });
     ui.showSnackBar('弹幕: ' + list.length + ' → ' + working.length);
   } else {
-    ui.showSnackBar('无实际弹幕限制');
+    dev.log('无实际弹幕限制');
   }
 }
 
 function pluginHandleUIAction(id) {
-  if (id === 'toggle') {
-    enabled = !enabled;
-    saveSwitchConfig();
-    pluginUIEntries = makeUI();
-    return { type: 'text', title: '弹幕限制器', content: enabled ? '已开启' : '已关闭' };
-  }
   if (id === 'limitToggle') {
     limitEnabled = !limitEnabled;
     saveSwitchConfig();
@@ -301,12 +279,6 @@ function pluginHandleUIAction(id) {
     saveSwitchConfig();
     pluginUIEntries = makeUI();
     return { type: 'text', title: '小字兼容', content: bigCompat ? '已开启，使用(N)标注' : '已关闭，使用₍ɴ₎标注' };
-  }
-  if (id === '_cfg') {
-    // 用户可能手动编辑了配置码，重新加载
-    refreshConfig();
-    pluginUIEntries = makeUI();
-    return { type: 'text', title: '配置', content: '已重新加载配置' };
   }
   return null;
 }
