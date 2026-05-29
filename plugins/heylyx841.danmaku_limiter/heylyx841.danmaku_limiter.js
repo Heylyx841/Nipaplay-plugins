@@ -96,6 +96,12 @@ function typeToMode(type) {
 
 // 使用原生相似度引擎做批量查重 + 合并
 function nativeMerge(list) {
+  // 先检查原生引擎是否可用
+  if (!danmaku.similarityAvailable || !danmaku.similarityAvailable()) {
+    dev.log('原生相似度引擎不可用，跳过合并');
+    return list;
+  }
+
   var items = [];
   // itemToOrig: items 数组索引 → 原始列表索引，O(1) 反向查找
   var itemToOrig = [];
