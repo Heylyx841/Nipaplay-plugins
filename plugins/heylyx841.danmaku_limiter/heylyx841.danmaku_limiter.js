@@ -201,27 +201,66 @@ function pluginOnEvent(e) {
     merged = src;
   }
 
-  // 限流
+  // 限流：先去重，再均匀pop
   var working;
   if (limitEnabled) {
-    // 滑动窗口限流：消除硬分桶的秒边界效应
-    var out = [];
-    var workList = [];
+    // 分离有时间/无时间的弹幕（无时间弹幕不受限流影响）
+    var timed = [];
+    var untimed = [];
     for (var i = 0; i < merged.length; i++) {
       var d = merged[i];
-      if (d && typeof d.time === 'number' && !isNaN(d.time)) workList.push(d);
+      if (d && typeof d.time === 'number' && !isNaN(d.time)) {
+        timed.push(d);
+      } else if (d) {
+        untimed.push(d);
+      }
     }
-    if (workList.length === 0) return;
 
-    // 前向指针滑动窗口扫描
-    var windowStart = 0;
-    for (var i = 0; i < workList.length; i++) {
-      var t = workList[i].time;
-      // 推进窗口左边界，排除超过1秒的旧项
-      while (windowStart < out.length && t - out[windowStart].time >= 1.0) windowStart++;
-      if (out.length - windowStart < maxPerSec) out.push(workList[i]);
+    if (timed.length === 0) {
+      working = merged;
+    } else {
+      // 按时间排序（限流需时间有序）
+      timed.sort(function(a, b) { return a.time - b.time; });
+
+      // 按1秒窗口分桶
+      var buckets = {};
+      for (var i = 0; i < timed.length; i++) {
+        var key = Math.floor(timed[i].time);
+        if (!buckets[key]) buckets[key] = [];
+        buckets[key].push(timed[i]);
+      }
+
+      var out = [];
+      var sortedKeys = Object.keys(buckets).sort(function(a, b) { return +a - +b; });
+      for (var k = 0; k < sortedKeys.length; k++) {
+        var bucket = buckets[sortedKeys[k]];
+
+        // 阶段1：内容去重（同1秒内相同内容只保留一条）
+        var seen = {};
+        var deduped = [];
+        for (var j = 0; j < bucket.length; j++) {
+          var c = bucket[j].content || '';
+          if (c && seen[c]) continue;
+          seen[c] = true;
+          deduped.push(bucket[j]);
+        }
+
+        // 阶段2：均匀pop（去重后仍超限则均匀采样）
+        if (deduped.length <= maxPerSec) {
+          for (var j = 0; j < deduped.length; j++) out.push(deduped[j]);
+        } else {
+          for (var j = 0; j < maxPerSec; j++) {
+            var idx = Math.floor(j * deduped.length / maxPerSec);
+            out.push(deduped[idx]);
+          }
+        }
+      }
+
+      // 保留无时间的弹幕
+      for (var i = 0; i < untimed.length; i++) out.push(untimed[i]);
+
+      working = out;
     }
-    working = out;
   } else {
     working = merged;
   }
