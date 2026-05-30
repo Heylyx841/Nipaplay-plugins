@@ -236,11 +236,11 @@ function pluginOnEvent(e) {
         var bucket = buckets[sortedKeys[k]];
 
         // 阶段1：内容去重（同1秒内相同内容只保留一条）
-        var seen = {};
+        var seen = Object.create(null);
         var deduped = [];
         for (var j = 0; j < bucket.length; j++) {
           var c = bucket[j].content || '';
-          if (c && seen[c]) continue;
+          if (seen[c]) continue;
           seen[c] = true;
           deduped.push(bucket[j]);
         }
